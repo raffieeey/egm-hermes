@@ -147,3 +147,39 @@ def test_inventories_are_json_serialisable():
     assert len(payload["reviewers"]) == 8
     assert len(payload["stages"]) == 5
     assert len(payload["standards"]) >= 5
+
+
+def test_review_lock_is_exclusive(tmp_path: Path):
+    from egm.reports import review_lock
+    target = tmp_path / "doc.md"
+    target.write_text("# x\n", encoding="utf-8")
+    with review_lock(target):
+        with pytest.raises(Exception):
+            with review_lock(target):
+                pass
+    with review_lock(target):
+        pass
+
+
+def test_review_lock_takes_over_a_stale_lock(tmp_path: Path):
+    import os
+    import time
+    from egm.reports import review_lock
+    target = tmp_path / "doc.md"
+    target.write_text("# x\n", encoding="utf-8")
+    with review_lock(target) as path:
+        os.utime(path, (time.time() - 7200, time.time() - 7200))
+    with review_lock(target, stale_seconds=60):
+        pass
+
+
+def test_settle_refs_uses_recorded_finding_ids(tmp_path: Path):
+    from egm.synth import normalize
+    from egm.types import EGMError
+    state = ReviewState(tmp_path / "s.json")
+    finding = normalize([_finding()], reviewer="design", round_no=1)[0]
+    state.record([finding], [_outcome()])
+    assert state.settle_refs([finding.id]) == 1
+    assert state.settle_refs([finding.id]) == 0
+    with pytest.raises(EGMError):
+        state.settle_refs(["design-r9-99"])

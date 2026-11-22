@@ -369,3 +369,35 @@ def test_drift_documents_skips_generated_reports(tmp_path: Path):
     (tmp_path / ".hidden" / "x.md").write_text("# x\n", encoding="utf-8")
     names = [p.name for p in review.drift_documents(tmp_path)]
     assert names == ["design.md"]
+
+
+def test_loop_round_applies_settled_ids_and_fixed_scopes(tmp_path: Path):
+    path = tmp_path / "doc.md"
+    path.write_text(DOC, encoding="utf-8")
+    kwargs = dict(reviewers=["design"], settings={"retries": 0}, state_base=tmp_path / "state")
+    first = review.run_loop_round(FakeCtx(FakeService()), path, **kwargs)
+    finding_id = first["findings"][0]["id"]
+
+    second = review.run_loop_round(FakeCtx(FakeService()), path, settled=[finding_id], **kwargs)
+    assert second["settled_applied"] == 1
+    assert second["verdict"]["clean"] is True
+
+
+def test_loop_round_reports_churn_after_a_fix(tmp_path: Path):
+    path = tmp_path / "doc.md"
+    path.write_text(DOC, encoding="utf-8")
+    kwargs = dict(reviewers=["design"], settings={"retries": 0}, state_base=tmp_path / "state")
+    review.run_loop_round(FakeCtx(FakeService()), path, **kwargs)
+    second = review.run_loop_round(FakeCtx(FakeService()), path, fixed_scopes=["L1-L2"], **kwargs)
+    assert second["fixed_scopes"] == ["L1-L2"]
+    assert second["verdict"]["churn"] is True
+
+
+def test_loop_round_rejects_unknown_settled_id(tmp_path: Path):
+    from egm.types import EGMError
+    path = tmp_path / "doc.md"
+    path.write_text(DOC, encoding="utf-8")
+    with pytest.raises(EGMError):
+        review.run_loop_round(FakeCtx(FakeService()), path, reviewers=["design"],
+                              settings={"retries": 0}, state_base=tmp_path / "state",
+                              settled=["design-r9-99"])

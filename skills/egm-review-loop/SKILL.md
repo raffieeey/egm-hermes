@@ -31,11 +31,6 @@ A Goldfish runs in a fresh context with no conversation history. In Hermes, call
 
 ## Inputs
 
-*   **`report_name`** (Optional): Filename for this round's artifact, default
-    `goldfish_review_report.md`. The caller may name it `critic_report.md` or
-    `implementation_readiness_report.md` to match the stage it drives.
-
-
 The caller or user provides exactly these parameters:
 
 *   **`TargetFile`**: Absolute or relative path to target document.
@@ -52,6 +47,17 @@ The caller or user provides exactly these parameters:
     `report_dir`) and pass its absolute path instead. If a page cannot be
     saved, ask the user for a local copy and end your turn; if no one can
     answer, as in a headless run, leave it out, tell the user, and keep going.
+
+Optional parameters, used from the second round onward:
+
+*   **`SettledFindings`**: Finding ids the user accepted or contested in earlier
+    rounds, passed to the tool as `settled`. Settled findings stop counting
+    against convergence.
+*   **`FixedScopes`**: Scopes whose fixes were applied since the last round,
+    passed to the tool as `fixed_scopes`. A new Blocker or Major there is churn.
+*   **`ReportName`**: Filename for this round's artifact, default
+    `goldfish_review_report.md`. The caller may name it `critic_report.md` or
+    `implementation_readiness_report.md` to match the stage it drives.
 
 ## Path & Standard Resolution Logic
 
@@ -114,8 +120,10 @@ at the start of every round; when you dispatch by hand, do it yourself.
     Call
     `egm_review_loop(target=TargetFile, reviewers=Reviewers,
     standards=Standards, semantic_target=SemanticTarget,
-    context=GoldfishContext, max_rounds=5)`. It runs this round's swarm and
-    returns `{ok, round, counts, verdict, findings, report_path}`.
+    context=GoldfishContext, max_rounds=5, settled=SettledFindings,
+    fixed_scopes=FixedScopes, report_name=ReportName)`. It runs this round's
+    swarm and returns `{ok, round, counts, verdict, findings, settled_applied,
+    fixed_scopes, report_path}`.
     *   **Hierarchical Dispatch (Synthesizer)**: With synthesizer dispatch, the
         intermediate `synthesizer` persona spawns the Goldfish review swarm in
         parallel, deduplicates findings, writes the report artifact, and returns
@@ -155,6 +163,9 @@ at the start of every round; when you dispatch by hand, do it yourself.
         breakdown).
     *   Apply approved text repairs to `TargetFile` using `patch` and
         `write_file`.
+    *   Collect the ids of contested and accepted-risk findings into
+        `SettledFindings`, and the scopes of applied fixes into `FixedScopes`,
+        for the next round.
 
 #### 2.4 Iteration Check & Turn Boundary
 

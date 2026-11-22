@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from .types import Finding, ReviewerOutcome, SEVERITIES, STATUS_COMPLETED
+from .types import EGMError, Finding, ReviewerOutcome, SEVERITIES, STATUS_COMPLETED
 
 MAX_ROUNDS = 5
 MAX_HISTORY = 12
@@ -170,6 +170,30 @@ class ReviewState:
         if added:
             self.save()
         return added
+
+    def settle_refs(self, refs: Iterable[str], reason: str = "settled by operator") -> int:
+        """Settle findings by id from any recorded round.
+
+        The loop tool receives ids from the previous report, so an accepted risk
+        stops counting against convergence. Unknown ids fail loudly: silently
+        ignoring a typo would leave the finding open and the round unclean.
+        """
+        wanted = list(dict.fromkeys(str(ref).strip() for ref in refs if str(ref).strip()))
+        if not wanted:
+            return 0
+        index: dict[str, Finding] = {}
+        for record in self.rounds:
+            for item in record.findings:
+                finding_id = str(item.get("id") or "")
+                if finding_id:
+                    index[finding_id] = Finding.from_mapping(
+                        item, reviewer=str(item.get("reviewer") or "reviewer"))
+        unknown = [ref for ref in wanted if ref not in index]
+        if unknown:
+            raise EGMError(
+                "Unknown finding id(s): " + ", ".join(unknown)
+                + ". Pass ids from the previous round's findings list or report.")
+        return self.settle([index[ref] for ref in wanted], reason)
 
     def mark_fixed(self, scopes: Iterable[str]) -> None:
         """Record scopes whose fixes were applied, for churn detection."""

@@ -103,6 +103,8 @@ def _review_loop(ctx: Any):
             settings=_settings(ctx),
             max_rounds=int(args.get("max_rounds") or 5),
             report_name=str(args.get("report_name") or "goldfish_review_report.md"),
+            settled=_as_list(args.get("settled")),
+            fixed_scopes=_as_list(args.get("fixed_scopes")),
         )
     return run
 
@@ -224,6 +226,12 @@ TOOL_SPECS: tuple[dict[str, Any], ...] = (
                 "max_rounds": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
                 "report_name": {"type": "string", "default": "goldfish_review_report.md",
                                 "description": "Artifact filename for this round's report."},
+                "settled": {"type": "array", "items": {"type": "string"},
+                            "description": ("Finding ids from earlier rounds that the user accepted or "
+                                            "contested. Settled findings stop counting against convergence.")},
+                "fixed_scopes": {"type": "array", "items": {"type": "string"},
+                                 "description": ("Scopes whose fixes were applied since the last round. "
+                                                 "A new Blocker or Major in one of them is reported as churn.")},
             },
             "required": ["target", "reviewers"],
         },

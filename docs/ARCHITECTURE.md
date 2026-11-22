@@ -54,8 +54,9 @@ reports.py  stage report + consolidated report on disk
 2. **Nothing from the parent conversation reaches a child.** The request carries
    `goal`, `context`, `role`, `correlation_id` and `metadata`; there is no field
    for history, and `metadata` is limited to the reviewer's name.
-3. **The target document is never modified by a review.** Reviewers are told they
-   are read-only; the engine only writes report artifacts.
+3. **The target document is not modified by the engine.** Reviewers are told they
+   are read-only, but the shared `file` toolset still contains write tools, so the
+   rule is enforced by the persona. The engine itself writes only report artifacts.
 4. **Reports are files, not chat.** The tool result is a compact JSON summary with
    paths; the skill tells the user where to look.
 5. **The five stages are data, not prose.** `catalog.STAGES` is the single source
@@ -91,6 +92,11 @@ are truncated individually with a visible marker.
 | Cap | 5 rounds by default |
 | Churn | a new Blocker/Major at a scope marked fixed in an earlier round |
 
+`egm_review_loop` takes `settled` (finding ids from earlier rounds) and
+`fixed_scopes`; the engine applies both before recording the round. That is what
+makes the settled and churn rows above real: an accepted risk stops blocking, and
+a regression on a fixed scope is flagged.
+
 The verdict is advisory but explicit: `{clean, converged, cap_reached, churn,
 reason}`. The driver stops on `converged`, and asks the user on `cap` or `churn`,
 exactly as the upstream skill specifies.
@@ -101,17 +107,18 @@ exactly as the upstream skill specifies.
   row in the docs. No engine change.
 - **New rubric**: drop a file in `standards/`; pass it by shortname.
 - **New stage**: add a `Stage` to `catalog.STAGES` and a preset tuple.
-- **Different model per reviewer**: set `reviewer_model` / `reviewer_provider` in
-  plugin settings, or route through a Hermes delegation provider.
+- **Different model for the reviewer swarm**: set `reviewer_model` /
+  `reviewer_provider` in plugin settings, or route through a Hermes delegation
+  provider.
 - **Different artifact location**: `report_dir` setting.
 
 ## What the host does not allow
 
 - Per-launch timeouts (`timeout_seconds` is rejected by the lifecycle API), so the
   plugin enforces its own wait budget and cancels the handle.
-- Per-tool blocks, so read-only reviewers are enforced by persona and by granting
-  only the `file` toolset — the same posture as upstream, where the persona owns
-  the read-only rule.
+- Per-tool blocks, so read-only reviewers rely on the persona plus the narrowest
+  built-in toolset (`file`), which still contains write tools. Upstream has the
+  same posture.
 - Launching outside an agent turn, so reviews run from a chat or a tool call, not
   from `hermes egm` on the command line. The CLI covers every deterministic
   operation instead.

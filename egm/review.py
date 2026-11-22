@@ -254,14 +254,15 @@ def run_review(ctx: Any, target: str | Path, options: ReviewOptions | None = Non
     runner = build_swarm(ctx, settings)
     label = f"stage:{options.stage}" if options.stage else (options.preset or "full")
     result = ReviewReport(target=str(doc.path), preset=label, split=split)
-    for plan in plans:
-        result.stages.append(run_stage(ctx, doc, split, plan, options, settings, out_dir, runner))
-    result.findings = tuple(synth.merge_stage_findings(result.stages))
-    if options.write_reports and len(plans) > 1:
-        consolidated = synth.render_consolidated(target=str(doc.path), split=split,
-                                                 stages=result.stages)
-        result.consolidated_path = str(reports.write_report(
-            out_dir, "consolidated_review_report.md", consolidated))
+    with reports.review_lock(doc.path):
+        for plan in plans:
+            result.stages.append(run_stage(ctx, doc, split, plan, options, settings, out_dir, runner))
+        result.findings = tuple(synth.merge_stage_findings(result.stages))
+        if options.write_reports and len(plans) > 1:
+            consolidated = synth.render_consolidated(target=str(doc.path), split=split,
+                                                     stages=result.stages)
+            result.consolidated_path = str(reports.write_report(
+                out_dir, "consolidated_review_report.md", consolidated))
     return result
 
 
@@ -271,7 +272,9 @@ def run_loop_round(ctx: Any, target: str | Path, *, reviewers: Sequence[str],
                    standards: dict[str, str] | None = None, semantic_target: str = "full file",
                    context: Sequence[str] = (), settings: dict[str, Any] | None = None,
                    max_rounds: int = 5, state_base: Path | None = None,
-                   report_name: str = "goldfish_review_report.md") -> dict[str, Any]:
+                   report_name: str = "goldfish_review_report.md",
+                   settled: Sequence[str] = (),
+                   fixed_scopes: Sequence[str] = ()) -> dict[str, Any]:
     """Run exactly one loop round, persist it, and return the findings plus verdict."""
     settings = settings or read_settings(ctx)
     if not reviewers:
@@ -291,21 +294,25 @@ def run_loop_round(ctx: Any, target: str | Path, *, reviewers: Sequence[str],
                                      standard_text=standard, context_files=files,
                                      mode="review", extra="", budget=budget)
         jobs.append(ReviewJob(spec, tuple(bundles)))
-    outcomes = (build_swarm(ctx, settings)).run(jobs)
-    findings = synth.dedupe([f for o in outcomes
-                             for f in synth.normalize(o.findings, reviewer=o.spec.name, round_no=1)])
+    with reports.review_lock(doc.path):
+        outcomes = (build_swarm(ctx, settings)).run(jobs)
+        findings = synth.dedupe([f for o in outcomes
+                                 for f in synth.normalize(o.findings, reviewer=o.spec.name, round_no=1)])
 
-    state = ReviewState(state_path(doc.path.parent, doc.path, base=state_base))
-    state.target = str(doc.path)
-    record = state.record(findings, outcomes)
-    verdict: Verdict = state.verdict(max_rounds=max_rounds)
+        state = ReviewState(state_path(doc.path.parent, doc.path, base=state_base))
+        state.target = str(doc.path)
+        if fixed_scopes:
+            state.mark_fixed(list(fixed_scopes))
+        settled_applied = state.settle_refs(list(settled)) if settled else 0
+        record = state.record(findings, outcomes)
+        verdict: Verdict = state.verdict(max_rounds=max_rounds)
 
-    out_dir = reports.report_directory(doc.path, str(settings.get("report_dir") or ""))
-    report = synth.render_review_report(
-        title=f"Goldfish Review Report — Round {record.round}", target=str(doc.path),
-        line_range=line_range, outcomes=outcomes, findings=findings, mode="review",
-    )
-    report_path = str(reports.write_report(out_dir, report_name or "goldfish_review_report.md", report))
+        out_dir = reports.report_directory(doc.path, str(settings.get("report_dir") or ""))
+        report = synth.render_review_report(
+            title=f"Goldfish Review Report — Round {record.round}", target=str(doc.path),
+            line_range=line_range, outcomes=outcomes, findings=findings, mode="review",
+        )
+        report_path = str(reports.write_report(out_dir, report_name or "goldfish_review_report.md", report))
     return {
         "ok": True,
         "target": str(doc.path),
@@ -315,6 +322,8 @@ def run_loop_round(ctx: Any, target: str | Path, *, reviewers: Sequence[str],
         "findings": [f.as_dict() for f in sort_findings(findings)],
         "reviewers": [o.as_dict() for o in outcomes],
         "verdict": verdict.as_dict(),
+        "settled_applied": settled_applied,
+        "fixed_scopes": list(fixed_scopes),
         "report_path": report_path,
         "state_path": str(state.path),
     }

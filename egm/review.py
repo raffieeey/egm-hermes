@@ -295,12 +295,14 @@ def run_loop_round(ctx: Any, target: str | Path, *, reviewers: Sequence[str],
                                      mode="review", extra="", budget=budget)
         jobs.append(ReviewJob(spec, tuple(bundles)))
     with reports.review_lock(doc.path):
-        outcomes = (build_swarm(ctx, settings)).run(jobs)
-        findings = synth.dedupe([f for o in outcomes
-                                 for f in synth.normalize(o.findings, reviewer=o.spec.name, round_no=1)])
-
         state = ReviewState(state_path(doc.path.parent, doc.path, base=state_base))
         state.target = str(doc.path)
+        round_no = state.round_count + 1
+        outcomes = (build_swarm(ctx, settings)).run(jobs)
+        findings = synth.dedupe([
+            f for o in outcomes
+            for f in synth.normalize(o.findings, reviewer=o.spec.name, round_no=round_no)])
+
         if fixed_scopes:
             state.mark_fixed(list(fixed_scopes))
         settled_applied = state.settle_refs(list(settled)) if settled else 0

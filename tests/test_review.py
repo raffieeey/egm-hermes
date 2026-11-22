@@ -401,3 +401,13 @@ def test_loop_round_rejects_unknown_settled_id(tmp_path: Path):
         review.run_loop_round(FakeCtx(FakeService()), path, reviewers=["design"],
                               settings={"retries": 0}, state_base=tmp_path / "state",
                               settled=["design-r9-99"])
+
+
+def test_loop_round_ids_use_the_round_number(tmp_path: Path):
+    path = tmp_path / "doc.md"
+    path.write_text(DOC, encoding="utf-8")
+    kwargs = dict(reviewers=["design"], settings={"retries": 0}, state_base=tmp_path / "state")
+    first = review.run_loop_round(FakeCtx(FakeService()), path, **kwargs)
+    second = review.run_loop_round(FakeCtx(FakeService()), path, **kwargs)
+    assert first["findings"][0]["id"].startswith("design-r1-")
+    assert second["findings"][0]["id"].startswith("design-r2-")

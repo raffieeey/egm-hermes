@@ -1,0 +1,30 @@
+Elephant-Goldfish Model (EGM) — Hermes Agent port
+==================================================
+
+Copyright 2026 Google LLC
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository is a derivative work of
+https://github.com/google/elephant-goldfish-model
+
+Copied verbatim from the upstream repository:
+
+  personas/*.md    <-  agents/*.md
+  standards/*.md   <-  resources/document_standards/*.md
+  templates/design_doc.md          <- skills/egm-draft/references/design_doc.md
+  templates/readme_templates.md    <- skills/egm-bootstrap/references/templates.md
+  templates/worker-return.schema.json
+                                   <- skills/egm-bootstrap/references/worker-return.schema.json
+
+Adapted for Hermes Agent (workflow unchanged; only harness mechanics replaced):
+
+  skills/egm-*/SKILL.md
+
+New work for Hermes Agent (not present upstream):
+
+  egm/             the review engine, tool surface, CLI and slash commands
+  __init__.py      plugin registration
+  tests/           engine tests
+
+Upstream describes itself as "not an officially supported Google product".
+This port is not affiliated with or endorsed by Google.

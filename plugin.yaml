@@ -1,0 +1,72 @@
+name: egm
+label: Elephant-Goldfish Model
+kind: standalone
+version: 1.0.0
+author: Port of google/elephant-goldfish-model (Apache-2.0) for Hermes
+homepage: https://github.com/raffieeey/egm-hermes
+description: >
+  Design with an elephant, review with a goldfish. Drafts specifications with full
+  project context, then stress-tests them with isolated zero-context reviewer
+  subagents that never saw the conversation. Ships the eight EGM workflow skills
+  (brainstorm, draft, review, review-loop, resolve, bootstrap, lite, drift-report),
+  ten reviewer personas, five document standards, and a deterministic review
+  engine that fans out reviewers, normalizes findings, tracks convergence across
+  rounds, and writes review artifacts. Requires a Hermes with the public subagent
+  lifecycle API.
+requires_hermes: ">=0.22.5"
+provides_tools:
+  - egm_review
+  - egm_brainstorm
+  - egm_review_loop
+  - egm_drift
+  - egm_lint
+  - egm_bootstrap_plan
+  - egm_status
+provides_hooks: []
+license: Apache-2.0
+tags:
+  - spec-driven-development
+  - review
+  - multi-agent
+  - design
+config_schema:
+  max_reviewers:
+    type: int
+    default: 6
+    label: Reviewer concurrency
+    description: Maximum reviewer children launched at once per stage.
+  reviewer_model:
+    type: str
+    default: ""
+    label: Reviewer model
+    description: Optional model override for reviewer children; empty inherits the delegation config.
+  reviewer_provider:
+    type: str
+    default: ""
+    label: Reviewer provider
+    description: Optional provider override for reviewer children; empty inherits the delegation config.
+  retries:
+    type: int
+    default: 1
+    label: Retries
+    description: Retries for a reviewer that fails or returns no report.
+  max_context_chars:
+    type: int
+    default: 26000
+    label: Context budget
+    description: Character budget for a reviewer prompt context. The host caps a child at 32000.
+  review_timeout_seconds:
+    type: int
+    default: 600
+    label: Reviewer wait budget
+    description: Client-side seconds to wait per reviewer before recording it as not run.
+  dual_run:
+    type: bool
+    default: false
+    label: Dual run
+    description: Run two independent instances of each reviewer to raise finding recall.
+  report_dir:
+    type: str
+    default: ""
+    label: Report directory
+    description: Fixed directory for review artifacts; empty writes beside the target document.

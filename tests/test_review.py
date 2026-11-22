@@ -411,3 +411,10 @@ def test_loop_round_ids_use_the_round_number(tmp_path: Path):
     second = review.run_loop_round(FakeCtx(FakeService()), path, **kwargs)
     assert first["findings"][0]["id"].startswith("design-r1-")
     assert second["findings"][0]["id"].startswith("design-r2-")
+
+
+def test_review_loop_tool_schema_exposes_ledger_inputs():
+    specs = {spec["name"]: spec for spec in tools.TOOL_SPECS}
+    properties = specs["egm_review_loop"]["parameters"]["properties"]
+    assert "settled" in properties
+    assert "fixed_scopes" in properties

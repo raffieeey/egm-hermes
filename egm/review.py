@@ -8,6 +8,7 @@ pipeline cannot drift between the skill text, the tool schema and the CLI.
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as _dt
 import hashlib
 import re
@@ -133,6 +134,21 @@ def plan_review(target: str | Path, options: ReviewOptions) -> tuple[Document, S
     return doc, split, plans
 
 
+def _align_outcomes(outcomes: Sequence[ReviewerOutcome],
+                   findings: Sequence[Finding]) -> list[ReviewerOutcome]:
+    """Make each reviewer's findings the same objects as the merged list.
+
+    Normalization assigns ids to the merged list, while an outcome still holds
+    the ids parsing gave it. Two numbering schemes for one finding make
+    "settle id X" ambiguous, so the nested view is rebuilt from the final list.
+    """
+    by_reviewer: dict[str, list[Finding]] = {}
+    for finding in findings:
+        by_reviewer.setdefault(finding.reviewer, []).append(finding)
+    return [dataclasses.replace(o, findings=tuple(by_reviewer.get(o.spec.name, ())))
+            for o in outcomes]
+
+
 def _spec_with_standard(name: str, overrides: dict[str, str]) -> ReviewerSpec:
     canonical = catalog.canonical_reviewer(name)
     standard = None
@@ -211,6 +227,7 @@ def run_stage(ctx: Any, doc: Document, split: Split, plan: StagePlan, options: R
     for outcome in outcomes:
         raw_findings.extend(synth.normalize(outcome.findings, reviewer=outcome.spec.name, round_no=1))
     findings = synth.dedupe(raw_findings)
+    outcomes = _align_outcomes(outcomes, findings)
 
     body = "\n\n".join(o.raw.strip() for o in outcomes if o.raw.strip())
     if plan.stage.key == "comprehension":
@@ -302,6 +319,7 @@ def run_loop_round(ctx: Any, target: str | Path, *, reviewers: Sequence[str],
         findings = synth.dedupe([
             f for o in outcomes
             for f in synth.normalize(o.findings, reviewer=o.spec.name, round_no=round_no)])
+        outcomes = _align_outcomes(outcomes, findings)
 
         if fixed_scopes:
             state.mark_fixed(list(fixed_scopes))

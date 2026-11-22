@@ -401,7 +401,11 @@ def _recover(payload: str, reviewer: str) -> list[Finding]:
 def parse_findings(payload: str, *, reviewer: str) -> list[Finding]:
     """Parse a reviewer payload into normalized, de-duplicated findings."""
     raw = _recover(payload, reviewer)
-    prepared = [f for f in (_prepare(f, reviewer) for f in raw) if f.description]
+    # The argument is authoritative: a payload that names a different reviewer
+    # (an alias, or a copy-paste from another persona) must not split the
+    # finding away from the reviewer that produced it.
+    prepared = [replace(f, reviewer=reviewer)
+                for f in (_prepare(f, reviewer) for f in raw) if f.description]
     if not prepared:
         if not raw:
             # A reviewer that reports `{"findings": []}` has completed its review

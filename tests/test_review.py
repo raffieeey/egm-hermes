@@ -418,3 +418,13 @@ def test_review_loop_tool_schema_exposes_ledger_inputs():
     properties = specs["egm_review_loop"]["parameters"]["properties"]
     assert "settled" in properties
     assert "fixed_scopes" in properties
+
+
+def test_loop_nested_findings_match_top_level_ids(tmp_path: Path):
+    path = tmp_path / "doc.md"
+    path.write_text(DOC, encoding="utf-8")
+    payload = review.run_loop_round(FakeCtx(FakeService()), path, reviewers=["design"],
+                                    settings={"retries": 0}, state_base=tmp_path / "state")
+    top = {f["id"] for f in payload["findings"]}
+    nested = {f["id"] for r in payload["reviewers"] for f in r["findings"]}
+    assert nested == top

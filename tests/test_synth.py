@@ -572,3 +572,8 @@ def test_merge_stage_findings_synthesizes_missing_ids() -> None:
 def test_parse_findings_accepts_an_empty_findings_array():
     assert parse_findings('{"reviewer": "design", "findings": []}', reviewer="design") == []
     assert parse_findings("[]", reviewer="style") == []
+
+
+def test_parse_findings_pins_the_reviewer_label():
+    payload = '{"reviewer": "design_critic", "findings": [{"severity": "major", "description": "x"}]}'
+    assert parse_findings(payload, reviewer="design")[0].reviewer == "design"
